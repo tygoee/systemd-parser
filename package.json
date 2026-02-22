@@ -1,0 +1,30 @@
+{
+  "name": "systemd-parser",
+  "version": "1.0.0",
+  "description": "Systemd configuration file parser",
+  "keywords": [
+    "systemd",
+    "parser",
+    "ini"
+  ],
+  "homepage": "https://github.com/tygoee/systemd-parser#readme",
+  "bugs": {
+    "url": "https://github.com/tygoee/systemd-parser/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tygoee/systemd-parser.git"
+  },
+  "license": "LGPL-2.1-or-later",
+  "author": "tygoe",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "tsc": "tsc",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

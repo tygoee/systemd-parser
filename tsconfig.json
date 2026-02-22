@@ -1,0 +1,18 @@
+{
+  "include": ["index.ts", "src/**/*"],
+  "exclude": ["test/**/*"],
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleDetection": "force",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+
+    "strict": true,
+    "noImplicitThis": true,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "useDefineForClassFields": true,
+
+    "skipLibCheck": true
+  }
+}
