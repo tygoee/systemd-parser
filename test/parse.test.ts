@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { parse } from "../src/parse.js";
+import { parse } from "../lib/parse.js";
 
 // Tests from https://github.com/systemd/systemd/blob/main/src/test/test-conf-parser.c
 const tests = [

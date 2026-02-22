@@ -18,13 +18,16 @@
   "license": "LGPL-2.1-or-later",
   "author": "tygoe",
   "type": "module",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "tsc": "tsc",
+    "build": "tsc",
     "test": "vitest"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
-  }
+  },
+  "files": [
+    "dist/**"
+  ]
 }

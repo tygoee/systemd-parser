@@ -1,18 +1,18 @@
 {
-  "include": ["index.ts", "src/**/*"],
-  "exclude": ["test/**/*"],
+  "include": ["lib/index.ts", "lib/**/*"],
   "compilerOptions": {
     "module": "nodenext",
     "moduleDetection": "force",
     "moduleResolution": "nodenext",
     "target": "es2022",
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "declaration": true,
 
     "strict": true,
     "noImplicitThis": true,
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "useDefineForClassFields": true,
-
-    "skipLibCheck": true
+    "useDefineForClassFields": true
   }
 }

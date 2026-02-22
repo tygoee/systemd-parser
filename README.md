@@ -6,6 +6,10 @@ Systemd configuration file parser
 
 Basics of the file format are listed at [systemd.syntax](https://www.freedesktop.org/software/systemd/man/latest/systemd.syntax.html).
 
+## License
+
+This project uses the LGPL-2.1+ license, as it copies a lot of the logic from systemd, of which the used parts are licensed under the same license.
+
 # References
 
 - Docs (very limited): <https://www.freedesktop.org/software/systemd/man/latest/systemd.syntax.html>
