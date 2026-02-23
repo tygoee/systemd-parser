@@ -3,6 +3,9 @@
 This is implementing most of the logic from config_parse() in
 https://github.com/systemd/systemd/blob/main/src/shared/conf-parser.c
 and is therefore also licensed with the LGPL-2.1
+
+It's also mostly rewritten in go for podman, in Parse():
+https://github.com/containers/podman/blob/main/pkg/systemd/parser/unitfile.go
 */
 
 const maxLength = 1048576; // 1 MiB
@@ -11,16 +14,9 @@ const maxLength = 1048576; // 1 MiB
 const trimWhitespaceStart = /^[ \t\n\r]+/;
 const trimWhitespace = /^[ \t\n\r]+|[ \t\n\r]+$/g;
 
-function warn(message: string, lineNum: number): { type: "none"; warn: [number, string] } {
-  console.warn(`${lineNum}: ${message}`);
+type WarnFunc = (message: string, lineNum: number) => { type: "none"; warn: [number, string] };
 
-  return { type: "none", warn: [lineNum, message] };
-}
-
-function parseLine(
-  line: string,
-  lineNum: number,
-):
+type ParsedLine =
   | {
       type: "section";
       name: string;
@@ -33,7 +29,30 @@ function parseLine(
   | {
       type: "none";
       warn?: [number, string];
-    } {
+    };
+
+type ParseFunc = (section: string, key: string, value: string) => any;
+
+// The generic is used to determine the return argument of func
+type ParseOptions<F extends ParseFunc | void = void> = {
+  // A function that executes upon successful assignment.
+  // If it returns something (not void/undefined), it'll be used as value parser, changing the result
+  func?: F;
+  warnFunc?: () => void;
+
+  logWarns?: boolean; // false
+  strict?: boolean; // false
+  // document?: boolean; // false, returns a markup-preserving document instead of simple key-value pairs
+};
+
+// If the return type contains/is void/undefined, the output can also be a string.
+type ParsedValue<F> = F extends (section: string, key: string, value: string) => infer R
+  ? R extends void | undefined
+    ? Exclude<R, void | undefined> | string
+    : R
+  : string;
+
+function parseLine(line: string, lineNum: number, warn: WarnFunc): ParsedLine {
   line = line.replace(trimWhitespace, "");
   if (!line) return { type: "none" };
 
@@ -65,25 +84,39 @@ function parseLine(
     value: line.slice(equalsIndex + 1).replace(trimWhitespace, ""),
   };
 }
+function parse<F extends ParseFunc | void = void>(
+  input: string,
+  options: ParseOptions<F> = {},
+): Record<string, Record<string, ParsedValue<F>[]>> {
+  if (typeof input !== "string") throw TypeError("First function argument must be a string");
+  if (typeof options !== "object") throw TypeError("Second function argument must be an object");
 
-function parse(input: string /*options: {}*/): Record<string, Record<string, string>> {
-  if (typeof input !== "string") throw TypeError("Function argument 'input' has to be a string");
+  const warn = (message: string, lineNum: number): { type: "none"; warn: [number, string] } => {
+    if (options.logWarns) console.warn(`${lineNum}: ${message}`);
+    if (options.strict) throw SyntaxError(`${lineNum}: ${message}`);
+
+    return { type: "none", warn: [lineNum, message] };
+  };
 
   // CRLF could be broken, but systemd works on Linux.
   // Also pretty memory inefficient but these files are usually really small
   const lines = input.split("\n");
-  const output: Record<string, Record<string, string>> = {};
+  const output: Record<string, Record<string, ParsedValue<F>[]>> = {};
 
   let section = "";
   let continuation = "";
   const updateOutput = (line: string, lineNum: number) => {
-    const parsed = parseLine(line, lineNum);
+    const parsed = parseLine(line, lineNum, warn);
     if (parsed.type === "section") section = parsed.name;
     else if (parsed.type === "assignment") {
       if (!section) return warn("Assignment outside of section. Ignoring.", lineNum);
 
+      let result;
+      if (typeof options.func === "function") result = options.func(section, parsed.key, parsed.value);
+
       output[section] ??= {};
-      output[section]![parsed.key] = parsed.value;
+      output[section]![parsed.key] ??= [];
+      output[section]![parsed.key]?.push(result !== undefined ? result : parsed.value);
     }
   };
 
