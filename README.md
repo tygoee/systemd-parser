@@ -5,17 +5,18 @@ Systemd configuration file parser. This is not stable, don't use it in productio
 Usage / documentation:
 
 ```js
-import { SystemD } from "systemd-parser"
+import { parse } from "systemd-parser"
 
 // Parsing from an input string
 const input = "[Section]\nKey=Value"
-SystemD.parse(input, {
+parse(input, {
   // A function that executes upon successful assignment.
   // If it returns something, it'll be used as value parser, changing the result
-  func: (section: string, key: string, value: string) => {}
+  func: (section: string, key: string, value: string) => {},
+  warnFunc: (message: string, lineNum: number, important: boolean) => {},  // Ran on warnings
 
-  logWarns: false  // Logs parsing warnings to the console
-  strict: false  // Fails on wrong syntax
+  logWarns: false,  // Logs parsing warnings to the console
+  strict: false,  // Makes parsing fail on wrong syntax
 })
 ```
 

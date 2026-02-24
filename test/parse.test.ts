@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { parse } from "../lib/parse.js";
+import { parse } from "../lib/index.ts";
 
 // Tests from https://github.com/systemd/systemd/blob/main/src/test/test-conf-parser.c
 const tests = [
@@ -131,7 +131,6 @@ setting1=3
 test.each(tests.map((test, index) => [index, test]))(
   "Test %i from test-conf-parser.c",
   (index: number, test: string) => {
-    console.log(test.substring(1, 20), index);
     switch (index) {
       case 1:
       case 2:
