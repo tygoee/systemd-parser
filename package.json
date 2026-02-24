@@ -1,6 +1,6 @@
 {
   "name": "systemd-parser",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Systemd configuration file parser",
   "keywords": [
     "systemd",
@@ -21,14 +21,18 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "test": "vitest"
+    "test": "vitest",
+    "prepublishOnly": "tsc"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   },
   "files": [
-    "dist/**",
-    "NOTICE"
+    "package.json",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "dist/**"
   ]
 }
