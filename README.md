@@ -1,23 +1,64 @@
 # Systemd parser
 
-Systemd configuration file parser. This is not stable, don't use it in production.
+Round-trip systemd configuration file parser.
 
 Usage / documentation:
+
+- `parse(input, options)`:
 
 ```js
 import { parse } from "systemd-parser"
 
-// Parsing from an input string
 const input = "[Section]\nKey=Value"
-parse(input, {
+const output = parse(input, {
   // A function that executes upon successful assignment.
   // If it returns something, it'll be used as value parser, changing the result
-  func: (section: string, key: string, value: string) => {},
-  warnFunc: (message: string, lineNum: number, important: boolean) => {},  // Ran on warnings
+  func: (section: string, key: string, value: string) => {};
+  warnFunc: (message: string, lineNum: number, important: boolean) => {};  // Ran on warnings
 
-  logWarns: false,  // Logs parsing warnings to the console
-  strict: false,  // Makes parsing fail on wrong syntax
+  logWarns: false;  // Log parsing warnings to the console
+  strict: false;  // Make parsing fail on wrong syntax
+
+  allowedKeys: { Section: [ Key1, Key2 ] }; // object of allowed sections and keys. Prefix '-' to ignore a key
+  onlyAllowed: true; // Only include strings from allowedKeys in the output
 })
+
+// output: { "Section": { "Key": [ "Value" ] } }
+```
+
+- `generate(input)`:
+
+```js
+import { generate } from "systemd-parser";
+
+const input = { Section: { Key: ["Value"] } };
+const output = generate(input);
+// [Section] Key=Value
+```
+
+- `parseDocument(input)`:
+
+```js
+import { parseDocument } from "systemd-parser"
+
+const doc = parseDocument("[Section]\nKey=Value")
+// doc.output: { "Section": { "Key": [ "Value" ] } }
+
+doc.add('Section', 'Key', 'ThirdValue')
+doc.add('Section', 'Key', 'SecondValue', 1) // insert
+// doc.content: [Section] Key=Value Key=SecondValue Key=ThirdValue
+
+doc.set('Section', 'Key' 'OtherValue', 1)
+// doc.content: [Section] Key=Value Key=OtherValue Key=ThirdValue
+
+doc.remove('Section', 'Key', 1)
+// doc.content: [Section] Key=Value Key=ThirdValue
+
+doc.set('Section', 'Key', 'Value') // resets all instances
+// doc.content: [Section] Key=Value
+
+doc.remove('Setion', 'Key', 'Value') // removes all instances
+// doc.content: ""
 ```
 
 ## Systemd ini format
@@ -39,4 +80,4 @@ Basics of the file format are listed at [systemd.syntax(7)](https://www.freedesk
 
 ## License
 
-This project uses the LGPL-2.1+ license, as it copies a lot of the logic from systemd, of which the used parts are licensed under the same license.
+This project uses the MIT license. It uses some of the logic from Red Hat for parsing systemd ini files, which is licensed under both LGPL-2.1+ [[1]](https://github.com/systemd/systemd/blob/main/src/shared/conf-parser.c) and Apache-2.0 [[2]](https://github.com/containers/podman/blob/main/pkg/systemd/parser/unitfile.go). For more details, see [NOTICE](./NOTICE)

@@ -1,6 +1,6 @@
 {
   "name": "systemd-parser",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Systemd configuration file parser",
   "keywords": [
     "systemd",
@@ -15,7 +15,7 @@
     "type": "git",
     "url": "git+https://github.com/tygoee/systemd-parser.git"
   },
-  "license": "LGPL-2.1-or-later",
+  "license": "MIT",
   "author": "tygoe",
   "type": "module",
   "main": "dist/index.js",

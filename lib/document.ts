@@ -8,6 +8,8 @@ export const trailingNewlines = /\n*$/;
 
 export type ParseFunc = (section: string, key: string, value: string) => any;
 
+export type ParsedOutput<V> = Record<string, Record<string, V[]>>;
+
 /** The generic is used to determine the return argument of func */
 export type ParseOptions<F extends ParseFunc | void = void> = {
   /** A function that executes upon successful assignment.
@@ -18,6 +20,9 @@ export type ParseOptions<F extends ParseFunc | void = void> = {
 
   logWarns?: boolean; /** default false, logs parsing warnings to the console */
   strict?: boolean; /** default false, makes parsing fail on wrong syntax */
+
+  allowedKeys?: Record<string, string[]>; /** object of allowed sections and keys. Prefix '-' to ignore a key */
+  onlyAllowed?: boolean; /** default true, Only include strings from allowedKeys in the output */
 };
 
 /** If the return type contains/is void/undefined, the output can also be a string. */
@@ -35,8 +40,8 @@ export type DeepReadonly<T> = {
 export class Document<F extends ParseFunc | void = void> {
   protected content_mut: string; /** (modified) input. use internally for setting without reparsing */
   readonly options: ParseOptions<F>; /** options passed to parse() */
-  protected output_mut: Record<string, Record<string, ParsedValue<F>[]>>; /** mutable output from parse() */
-  protected parseFunc: () => typeof this.output_mut;
+  protected output_mut: ParsedOutput<ParsedValue<F>>; /** mutable output from parse() */
+  protected parseFunc: () => ParsedOutput<ParsedValue<F>>;
   protected lineNums: {
     sections: Record<string, number>; /** last line of section */
     assignments: Record<string, Record<string, number[]>> /** all assignment lines */;
@@ -53,7 +58,7 @@ export class Document<F extends ParseFunc | void = void> {
   }
 
   /** Read-only to prevent confusion with document not changing when adding/removing values */
-  get output(): DeepReadonly<typeof this.output_mut> {
+  get output(): DeepReadonly<ParsedOutput<ParsedValue<F>>> {
     return this.output_mut;
   }
 
@@ -80,15 +85,18 @@ export class Document<F extends ParseFunc | void = void> {
     key = key.replace(trimWhitespace, "");
     value = value.replace(trimWhitespace, "");
 
+    if (!key) throw TypeError("Key is empty");
     if (value[value.length - 1] === "\\") value += " "; // escape the backslash
 
     // remove the trailing space added when backslash is escaped
     return [key, value];
   }
 
-  set(section: string, key: string, value: string) {
+  set(section: string, key: string, value: string, index?: number) {
     if (typeof section !== "string" || typeof key !== "string" || typeof value !== "string")
       throw TypeError("First three function arguments must be of type string");
+
+    if (index !== undefined && typeof index !== "number") throw TypeError("Fourth argument must be a number");
 
     [key, value] = this.#prepare(section, key, value);
 
@@ -109,15 +117,23 @@ export class Document<F extends ParseFunc | void = void> {
       return;
     }
 
-    // Existing section, existing assignments
-    const firstAssignment = assignments[0]!; // confirmed length !== 0
-    let offset = -1; // Subtract 1 more every time an item gets removed
-    for (const assignment of assignments) {
-      lines.splice(assignment + offset, 1);
-      offset--;
+    if (index === undefined || index < 0) {
+      // Existing section, existing assignments
+      const first = assignments[0]!; // confirmed length !== 0
+      let offset = -1; // Subtract 1 more every time an item gets removed
+      for (const assignment of assignments) {
+        lines.splice(assignment + offset, 1);
+        offset--;
+      }
+
+      lines.splice(first - 1, 0, `${key}=${value}`);
+    } else {
+      const target = assignments[index];
+      if (target === undefined) throw RangeError("Assignment index out of range");
+
+      lines.splice(target - 1, 1, `${key}=${value}`);
     }
 
-    lines.splice(firstAssignment - 1, 0, `${key}=${value}`);
     this.content = lines.join("\n");
   }
 

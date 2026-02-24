@@ -65,11 +65,21 @@ test("test document setter: single existing assignment", () => {
   expect(doc.output.Section?.Key?.[0]).toBe("Value2");
 });
 
-test("test document setter: multiple existing assignments", () => {
+test("test document setter: multiple existing assignments without meaningful index", () => {
+  for (let index of [undefined, -1, -2]) {
+    const doc = parseDocument("[Section]\nKey=Value1\nKey=Value2");
+    doc.set("Section", "Key", "Value3", index);
+    expect(doc.content).toBe("[Section]\nKey=Value3\n");
+    expect(doc.output.Section?.Key?.[0]).toBe("Value3");
+  }
+});
+
+test("test document setter: multiple existing assignments with index", () => {
   const doc = parseDocument("[Section]\nKey=Value1\nKey=Value2");
-  doc.set("Section", "Key", "Value3");
-  expect(doc.content).toBe("[Section]\nKey=Value3\n");
+  doc.set("Section", "Key", "Value3", 0);
+  expect(doc.content).toBe("[Section]\nKey=Value3\nKey=Value2\n");
   expect(doc.output.Section?.Key?.[0]).toBe("Value3");
+  expect(doc.output.Section?.Key?.[1]).toBe("Value2");
 });
 
 test("test document adder: existing assignments without meaningful index", () => {
@@ -111,7 +121,6 @@ test("test document remover: single assignment removing header without meaningfu
 test("test document remover: multiple assignments removing header", () => {
   const doc = parseDocument("[Section]\nKey=Value\nKey=Value\nKey=Value");
   doc.remove("Section", "Key");
-  console.log(doc.content);
   expect(doc.content).toBe("\n");
 });
 
@@ -130,6 +139,5 @@ test("test document remover: multiple assignments with same key", () => {
 test("test document remover: multiple assignments with index", () => {
   const doc = parseDocument("[Section]\nKey=Value\nKey=Value\nKey=Value");
   doc.remove("Section", "Key", 1);
-  console.log(doc.content);
   expect(doc.content).toBe("[Section]\nKey=Value\nKey=Value\n");
 });

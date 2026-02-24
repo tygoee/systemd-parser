@@ -79,11 +79,25 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
   #updateOutput(line: string) {
     const parsed = this.#parseLine(line);
     if (parsed.type === "section") {
-      this.#section = parsed.name;
+      this.#section = parsed.name; // placed here because type=assignment needs it
+
+      if (
+        typeof this.options.allowedKeys === "object" &&
+        !Object.keys(this.options.allowedKeys).includes(parsed.name)
+      ) {
+        this.warn("Unkown section. Ignoring.");
+        if (!this.options.onlyAllowed) return;
+      }
+
       this.lineNums.sections[parsed.name] = this.#lineNum;
       this.output_mut[parsed.name] ??= {};
     } else if (parsed.type === "assignment") {
-      if (!this.#section) return this.warn("Assignment outside of section. Ignoring.");
+      if (!this.#section) return void this.warn("Assignment outside of section. Ignoring.");
+      if (!this.options.allowedKeys?.[this.#section]?.includes(parsed.key)) {
+        this.warn("Unknown key. Ignoring");
+        if (this.options.onlyAllowed) return;
+      }
+
       this.lineNums.sections[this.#section] = this.#lineNum;
       this.lineNums.assignments[this.#section] ??= {};
       this.lineNums.assignments[this.#section]![parsed.key] ??= [];
