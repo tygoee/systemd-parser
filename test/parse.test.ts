@@ -128,6 +128,7 @@ setting1=3
 `,
 ];
 
+const options = { logWarns: true };
 test.each(tests.map((test, index) => [index, test]))(
   "Test %i from test-conf-parser.c",
   (index: number, test: string) => {
@@ -136,7 +137,7 @@ test.each(tests.map((test, index) => [index, test]))(
       case 2:
       case 3:
       case 4:
-        expect(parse(test).Section?.setting1?.pop()).toBe("1");
+        expect(parse(test, options).Section?.setting1?.pop()).toBe("1");
         break;
       case 5:
       case 6:
@@ -144,24 +145,24 @@ test.each(tests.map((test, index) => [index, test]))(
       case 8:
       case 9:
       case 10:
-        expect(parse(test).Section?.setting1?.pop()).toBe("1 2 3");
+        expect(parse(test, options).Section?.setting1?.pop()).toBe("1 2 3");
         break;
       case 11:
-        expect(parse(test).Section?.setting1?.pop()).toBe("1\\\\ \\\\2");
+        expect(parse(test, options).Section?.setting1?.pop()).toBe("1\\\\ \\\\2");
         break;
       case 12:
-        expect(parse(test).Section?.setting1?.pop()).toBe("ABCD".repeat(1000));
+        expect(parse(test, options).Section?.setting1?.pop()).toBe("ABCD".repeat(1000));
         break;
       case 13:
       case 14:
-        expect(parse(test).Section?.setting1?.pop()).toBe(`${"ABCD".repeat(1000)} foobar`);
+        expect(parse(test, options).Section?.setting1?.pop()).toBe(`${"ABCD".repeat(1000)} foobar`);
         break;
       case 15:
       case 16:
-        expect(() => parse(test)).toThrow(SyntaxError);
+        expect(() => parse(test, options)).toThrow(SyntaxError);
         break;
       case 17:
-        expect(parse(test).Section?.setting1?.pop()).toBe("2");
+        expect(parse(test, options).Section?.setting1?.pop()).toBe("2");
         break;
     }
   },

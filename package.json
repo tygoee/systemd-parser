@@ -1,6 +1,6 @@
 {
   "name": "systemd-parser",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Systemd configuration file parser",
   "keywords": [
     "systemd",
@@ -28,6 +28,7 @@
     "vitest": "^4.0.18"
   },
   "files": [
-    "dist/**"
+    "dist/**",
+    "NOTICE"
   ]
 }

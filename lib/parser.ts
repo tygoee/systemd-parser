@@ -45,7 +45,10 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
 
   #parseLine(line: string): ParsedLine {
     line = line.replace(trimWhitespace, "");
-    if (!line) return this.warn("Continuation terminated by empty line");
+    if (!line) {
+      if (this.#continuation) this.warn("Continuation terminated by empty line");
+      return { type: "none" };
+    }
 
     // Section
     if (line[0] === "[") {
@@ -56,9 +59,7 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
       // The section name may not contain control chars, quotes or backslashes
       if (sectionValidator.test(name)) return this.warn(`Bad characters in section header, ignoring line.`);
 
-      // In the original it checks if the section is known and warns the user when it's unkown
-      // It ignores when prefixed with X-. Known sections array has non-required sections prefixed with -
-      // This is not done in here as it can be done post-parsing. Might be added later
+      // The checks done in the original are in updateOutput
       return { type: "section", name: name };
     }
 
@@ -67,8 +68,7 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
     if (equalsIndex === -1) return this.warn("Missing '=', ignoring line.");
     if (equalsIndex === 0) return this.warn("Missing key name before '=', ignoring line.");
 
-    // In the original it now calls next_assignment, in which it looks up a parse-function map for values
-    // This is not done in here as it can be done post-parsing. Might be added later
+    // The checks and functions from the original are in updateOutput
     return {
       type: "assignment",
       key: line.slice(0, equalsIndex).replace(trimWhitespace, ""),
@@ -86,16 +86,22 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
         !Object.keys(this.options.allowedKeys).includes(parsed.name)
       ) {
         this.warn("Unkown section. Ignoring.");
-        if (!this.options.onlyAllowed) return;
+        if (!this.options.includeDisallowed) return;
       }
 
       this.lineNums.sections[parsed.name] = this.#lineNum;
       this.output_mut[parsed.name] ??= {};
     } else if (parsed.type === "assignment") {
       if (!this.#section) return void this.warn("Assignment outside of section. Ignoring.");
-      if (!this.options.allowedKeys?.[this.#section]?.includes(parsed.key)) {
+      if (!this.options.includePrefixed && parsed.key.startsWith("X-")) return;
+
+      const section = this.options.allowedKeys?.[this.#section];
+      if (typeof this.options.allowedKeys === "object" && !section?.includes(parsed.key)) {
+        // allowedKeys prefixed with '-' are ignored without a warning
+        if (section?.includes("-" + parsed.key)) return;
+
         this.warn("Unknown key. Ignoring");
-        if (this.options.onlyAllowed) return;
+        if (!this.options.includeDisallowed) return;
       }
 
       this.lineNums.sections[this.#section] = this.#lineNum;

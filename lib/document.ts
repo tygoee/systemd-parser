@@ -21,8 +21,9 @@ export type ParseOptions<F extends ParseFunc | void = void> = {
   logWarns?: boolean; /** default false, logs parsing warnings to the console */
   strict?: boolean; /** default false, makes parsing fail on wrong syntax */
 
+  includePrefixed?: boolean; /** default false, include keys prefixed with X- */
   allowedKeys?: Record<string, string[]>; /** object of allowed sections and keys. Prefix '-' to ignore a key */
-  onlyAllowed?: boolean; /** default true, Only include strings from allowedKeys in the output */
+  includeDisallowed?: boolean; // include keys not allowed by allowedKeys
 };
 
 /** If the return type contains/is void/undefined, the output can also be a string. */

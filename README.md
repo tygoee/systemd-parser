@@ -19,8 +19,9 @@ const output = parse(input, {
   logWarns: false;  // Log parsing warnings to the console
   strict: false;  // Make parsing fail on wrong syntax
 
-  allowedKeys: { Section: [ Key1, Key2 ] }; // object of allowed sections and keys. Prefix '-' to ignore a key
-  onlyAllowed: true; // Only include strings from allowedKeys in the output
+  includePrefixed: false; // default false, include keys prefixed with X-
+  allowedKeys: { Section: [ "Key1", "Key2" ] }; // object of allowed sections and keys. Prefix '-' to ignore a key
+  includeDisallowed: false; // include keys not allowed by allowedKeys
 })
 
 // output: { "Section": { "Key": [ "Value" ] } }
