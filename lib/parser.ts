@@ -1,5 +1,5 @@
 import { Document, sectionValidator, trimWhitespace, trimWhitespaceStart } from "./document.js";
-import type { ParseFunc, ParseOptions } from "./document.js";
+import type { ParseFunc, ParseOptions, Severity } from "./document.js";
 
 const maxLength = 1048576; // 1 MiB
 
@@ -18,37 +18,46 @@ type ParsedLine =
     };
 
 export class Parser<F extends ParseFunc | void = void> extends Document<F> {
-  warnings: [string, number][]; /** message, line number */
+  warnings: [string, number, Severity][]; /** message, line number, severity */
   #section: string;
   #continuation: string;
   #lineNum: number;
 
   constructor(input: string, options: ParseOptions<F> = {}) {
     super(input, options);
-
     this.parseFunc = this.parse;
-    this.warnings = [];
+    this.warnings = this.#warningsProxy();
     this.#section = "";
     this.#continuation = "";
     this.#lineNum = 0;
   }
 
-  warn(message: string, important: boolean = true): { type: "none" } {
-    if (this.options.logWarns) console.warn(`${this.#lineNum}: ${message}`);
-    if (this.options.strict && !important) throw SyntaxError(`${this.#lineNum}: ${message}`);
-    this.warnings.push([message, this.#lineNum]);
+  /** Negative/zero/no lineNum to use the current */
+  warn(message: string, lineNum?: number, severity: Severity | undefined = "warning"): { type: "none" } {
+    if (!lineNum || lineNum <= 0) lineNum = this.#lineNum;
 
-    if (typeof this.options.warnFunc === "function") this.options.warnFunc(message, this.#lineNum, important);
+    if (this.options.logWarns) console.warn(`${lineNum}: ${message}`);
+    if (this.options.strict && !severity) throw SyntaxError(`${lineNum}: ${message}`);
+    this.warnings.push([message, lineNum, severity]);
 
     return { type: "none" };
   }
 
+  #warningsProxy(): [string, number, Severity][] {
+    const self = this;
+    return new Proxy([], {
+      set(target: [string, number, Severity][], prop: string | symbol, value: [string, number, Severity]): boolean {
+        if (isNaN(Number(prop))) return true;
+        if (typeof self.options.warnFunc === "function") self.options.warnFunc(...value);
+
+        target[Number(prop)] = value;
+        return true;
+      },
+    });
+  }
+
   #parseLine(line: string): ParsedLine {
-    line = line.replace(trimWhitespace, "");
-    if (!line) {
-      if (this.#continuation) this.warn("Continuation terminated by empty line");
-      return { type: "none" };
-    }
+    if (!line) return { type: "none" }; // should be unreachable
 
     // Section
     if (line[0] === "[") {
@@ -128,7 +137,7 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
       sections: {},
       assignments: {},
     };
-    this.warnings = [];
+    this.warnings = this.#warningsProxy();
 
     this.#section = "";
     this.#continuation = "";
@@ -137,7 +146,7 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
 
       if (line.length > maxLength) throw SyntaxError(`${this.#lineNum}: Line too long`);
 
-      // Temporarily trim leading whitespace to find comments. Inline comments don't exist in systemd
+      // Seperately trim leading whitespace to find comments. Inline comments don't exist in systemd
       // Don't stop on empty lines yet as they have to stop continuation
       const trimmed = line.replace(trimWhitespaceStart, "");
       if (trimmed[0] === "#" || trimmed[0] === ";") continue;
@@ -145,6 +154,7 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
       if (this.#continuation) {
         if (this.#continuation.length + line.length > maxLength)
           throw SyntaxError(`${this.#lineNum}: Continuation line too long`);
+        if (!trimmed) this.warn("Continuation has been terminated by empty line", this.#lineNum - 1, "info");
         this.#continuation += line;
       }
 
@@ -159,7 +169,9 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
       this.#continuation = "";
     }
 
-    if (this.#continuation) this.#updateOutput(this.#continuation);
+    if (this.#continuation) {
+      this.#updateOutput(this.#continuation);
+    }
 
     return this.output_mut;
   }

@@ -9,7 +9,7 @@ https://github.com/containers/podman/blob/main/pkg/systemd/parser/unitfile.go
 
 import { Parser } from "./parser.js";
 import { sectionValidator, trailingNewlines, trimWhitespace } from "./document.js";
-import type { ParsedOutput, ParsedValue, ParseFunc, ParseOptions } from "./document.js";
+import type { ParsedOutput, ParsedValue, ParseFunc, ParseOptions, Severity } from "./document.js";
 
 function parse<F extends ParseFunc | void = void>(
   input: string,
@@ -50,4 +50,4 @@ function generate(input: ParsedOutput<string>) {
 }
 
 export { Parser, parse, parseDocument, generate };
-export type { ParsedValue, ParseFunc, ParseOptions };
+export type { ParsedValue, ParseFunc, ParseOptions, Severity };

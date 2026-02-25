@@ -6,6 +6,8 @@ export const trimWhitespace = /^[ \t\n\r]+|[ \t\n\r]+$/g;
 export const sectionValidator = /[\x01-\x1f\x7f"'\\]/;
 export const trailingNewlines = /\n*$/;
 
+export type Severity = "hint" | "info" | "warning" | "error";
+
 export type ParseFunc = (section: string, key: string, value: string) => any;
 
 export type ParsedOutput<V> = Record<string, Record<string, V[]>>;
@@ -16,7 +18,7 @@ export type ParseOptions<F extends ParseFunc | void = void> = {
    * If it returns something (not void/undefined),
    * it'll be used as value parser, changing the result */
   func?: F;
-  warnFunc?: (message: string, lineNum: number, important: boolean) => void; /** ran on warnings */
+  warnFunc?: (message: string, lineNum: number, severity: Severity) => void; /** ran on warnings */
 
   logWarns?: boolean; /** default false, logs parsing warnings to the console */
   strict?: boolean; /** default false, makes parsing fail on wrong syntax */

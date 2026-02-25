@@ -14,7 +14,7 @@ const output = parse(input, {
   // A function that executes upon successful assignment.
   // If it returns something, it'll be used as value parser, changing the result
   func: (section: string, key: string, value: string) => {};
-  warnFunc: (message: string, lineNum: number, important: boolean) => {};  // Ran on warnings
+  warnFunc: (message: string, lineNum: number, severity: "hint"|"info"|"warning"|"error") => {}; // Ran on warnings
 
   logWarns: false;  // Log parsing warnings to the console
   strict: false;  // Make parsing fail on wrong syntax
