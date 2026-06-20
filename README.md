@@ -2,7 +2,12 @@
 
 Round-trip systemd configuration file parser.
 
-Usage / documentation:
+> [!WARNING]
+> This has not been under active developement for a while, and it was stopped while building a pretty big overhaul fixing quite some poor design choices and bugs.
+>
+> I might pick this project up again when I have the time and means to continue with [tygoee/congent](https://github.com/tygoee/congent)
+
+# Usage and documentation
 
 - `parse(input, options)`:
 
