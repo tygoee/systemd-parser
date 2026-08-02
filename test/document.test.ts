@@ -1,3 +1,6 @@
+// test linefrom and lineto!
+// multiple section headers with last being empty
+// test #clearAssignment
 import { expect, test } from "vitest";
 import { parseDocument } from "../lib";
 
@@ -108,7 +111,8 @@ test("test document adder: existing assignments with index zero", () => {
 
 test("test document adder: existing assignments with index out of range", () => {
   const doc = parseDocument("[Section]\nKey=Value1\nKey=Value2", options);
-  expect(() => doc.add("Section", "Key", "Value3", 3)).toThrow(RangeError);
+  doc.add("Section", "Key", "Value3", 3);
+  expect(doc.content).toBe("[Section]\nKey=Value1\nKey=Value2\nKey=Value3\n");
 });
 
 test("test document remover: single assignment removing header without meaningful index", () => {
@@ -123,6 +127,17 @@ test("test document remover: multiple assignments removing header", () => {
   const doc = parseDocument("[Section]\nKey=Value\nKey=Value\nKey=Value", options);
   doc.remove("Section", "Key");
   expect(doc.content).toBe("\n");
+});
+
+test("test document remover: section between other sections", () => {
+  for (let index of [undefined, 0, -1, -2]) {
+    const doc = parseDocument(
+      "[Section1]\nKey1=Value1\n\n[Section2]\nKey2=Value2\n\n[Section3]\nKey3=Value\n",
+      options,
+    );
+    doc.remove("Section2", "Key2", index);
+    expect(doc.content).toBe("[Section1]\nKey1=Value1\n\n[Section3]\nKey3=Value\n");
+  }
 });
 
 test("test document remover: multiple different assignments", () => {

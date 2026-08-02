@@ -17,36 +17,45 @@ type ParsedLine =
       type: "none";
     };
 
+type Warning = [string, Severity, [number, number, number]];
+
 export class Parser<F extends ParseFunc | void = void> extends Document<F> {
-  warnings: [string, number, Severity][]; /** message, line number, severity */
+  /** message, severity, [line (1-based), from char, to char] */
+  warnings: Warning[];
   #section: string;
-  #continuation: string;
-  #lineNum: number;
+
+  /** Current line, 1-based */ #lineNum: number;
+  /** Start line of current node, 1-based */ #lineFrom: number;
+  /** Array of line lengths by line, 1-based */ #lineLengths: number[];
 
   constructor(input: string, options: ParseOptions<F> = {}) {
     super(input, options);
-    this.parseFunc = this.parse;
+    this.parserFunc = this.parse;
     this.warnings = this.#warningsProxy();
     this.#section = "";
-    this.#continuation = "";
-    this.#lineNum = 0;
+
+    this.#lineNum = 1;
+    this.#lineFrom = 1;
+    this.#lineLengths = [0]; // 1 value already since it's 1-based
   }
 
-  /** Negative/zero/no lineNum to use the current */
-  warn(message: string, lineNum?: number, severity: Severity | undefined = "warning"): { type: "none" } {
-    if (!lineNum || lineNum <= 0) lineNum = this.#lineNum;
+  /** Don't pass a location to use the current one */
+  warn(message: string, severity: Severity = "warning", location?: [number, number, number]): { type: "none" } {
+    if (!location) location = [this.#lineNum, 0, this.#lineLengths[this.#lineNum]!];
 
-    if (this.options.logWarns) console.warn(`${lineNum}: ${message}`);
-    if (this.options.strict && !severity) throw SyntaxError(`${lineNum}: ${message}`);
-    this.warnings.push([message, lineNum, severity]);
+    if (this.options.logWarns) console.warn(`${location[0]}:${location[1]}: ${message}`);
+    if (this.options.strict && !["hint", "info"].includes(severity))
+      throw SyntaxError(`${location[0]}:${location[1]}: ${message}`);
+    this.warnings.push([message, severity, location]);
 
+    console.log(message);
     return { type: "none" };
   }
 
-  #warningsProxy(): [string, number, Severity][] {
+  #warningsProxy(): Warning[] {
     const self = this;
     return new Proxy([], {
-      set(target: [string, number, Severity][], prop: string | symbol, value: [string, number, Severity]): boolean {
+      set(target: Warning[], prop: string | symbol, value: Warning): boolean {
         if (isNaN(Number(prop))) return true;
         if (typeof self.options.warnFunc === "function") self.options.warnFunc(...value);
 
@@ -57,7 +66,7 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
   }
 
   #parseLine(line: string): ParsedLine {
-    if (!line) return { type: "none" }; // should be unreachable
+    if (!line) return { type: "none" };
 
     // Section
     if (line[0] === "[") {
@@ -66,7 +75,7 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
       const name = line.slice(1, -1);
 
       // The section name may not contain control chars, quotes or backslashes
-      if (sectionValidator.test(name)) return this.warn(`Bad characters in section header, ignoring line.`);
+      if (sectionValidator.test(name)) return this.warn(`Invalid section header, ignoring line.`);
 
       // The checks done in the original are in updateOutput
       return { type: "section", name: name };
@@ -74,7 +83,10 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
 
     // Assignment (key=value)
     const equalsIndex = line.indexOf("=");
-    if (equalsIndex === -1) return this.warn("Missing '=', ignoring line.");
+    if (equalsIndex === -1) {
+      console.log(line);
+      return this.warn("Missing '=', ignoring line.");
+    }
     if (equalsIndex === 0) return this.warn("Missing key name before '=', ignoring line.");
 
     // The checks and functions from the original are in updateOutput
@@ -85,10 +97,12 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
     };
   }
 
-  #updateOutput(line: string) {
-    const parsed = this.#parseLine(line);
+  #updateOutput(joinedLine: string, rawLine: string) {
+    const parsed = this.#parseLine(joinedLine);
+
     if (parsed.type === "section") {
-      this.#section = parsed.name; // placed here because type=assignment needs it
+      // placed at the beginning because type=assignment needs it (don't skip with unknown section)
+      this.#section = parsed.name;
 
       if (
         typeof this.options.allowedKeys === "object" &&
@@ -98,32 +112,35 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
         if (!this.options.includeDisallowed) return;
       }
 
-      this.lineNums.sections[parsed.name] = this.#lineNum;
-      this.output_mut[parsed.name] ??= {};
+      this.doc.push({ type: "section", name: parsed.name, fromLine: this.#lineNum, toLine: this.#lineNum });
     } else if (parsed.type === "assignment") {
       if (!this.#section) return void this.warn("Assignment outside of section. Ignoring.");
       if (!this.options.includePrefixed && parsed.key.startsWith("X-")) return;
 
       const section = this.options.allowedKeys?.[this.#section];
       if (typeof this.options.allowedKeys === "object" && !section?.includes(parsed.key)) {
-        // allowedKeys prefixed with '-' are ignored without a warning
-        if (section?.includes("-" + parsed.key)) return;
-
         this.warn("Unknown key. Ignoring");
         if (!this.options.includeDisallowed) return;
       }
 
-      this.lineNums.sections[this.#section] = this.#lineNum;
-      this.lineNums.assignments[this.#section] ??= {};
-      this.lineNums.assignments[this.#section]![parsed.key] ??= [];
-      this.lineNums.assignments[this.#section]![parsed.key]!.push(this.#lineNum);
+      const result =
+        typeof this.options.parseFunc === "function"
+          ? this.options.parseFunc(this.#section, parsed.key, parsed.value)
+          : parsed.value;
 
-      let result;
-      if (typeof this.options.func === "function") result = this.options.func(this.#section, parsed.key, parsed.value);
-
-      this.output_mut[this.#section] ??= {}; // to be sure, shouldn't be reachable
-      this.output_mut[this.#section]![parsed.key] ??= [];
-      this.output_mut[this.#section]![parsed.key]!.push(result !== undefined ? result : parsed.value);
+      const valueIndex = rawLine.indexOf("=") + 1;
+      this.doc.push({
+        type: "assignment",
+        key: parsed.key,
+        rawValue: rawLine.slice(valueIndex),
+        joinedValue: joinedLine.slice(valueIndex),
+        value: result,
+        fromLine: this.#lineFrom,
+        toLine: this.#lineNum,
+      });
+    } else {
+      if (!rawLine.replace(trimWhitespace, "")) this.doc.push({ type: "blank" });
+      else this.doc.push({ type: "invalid", content: rawLine });
     }
   }
 
@@ -131,48 +148,71 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
     // CRLF could be broken, but systemd works on Linux. Could become a stream for efficiency
     // Adds a first value as line numbers count from 1 instead of 0
     const lines = ["", ...this.content.split("\n")];
+    let rawLine = "";
+    let continuation = "";
 
-    this.output_mut = {};
-    this.lineNums = {
-      sections: {},
-      assignments: {},
-    };
     this.warnings = this.#warningsProxy();
 
     this.#section = "";
-    this.#continuation = "";
+    this.#lineFrom = 1;
+    this.#lineLengths = [0]; // 1 value already since it's 1-based
     for (this.#lineNum = 1; this.#lineNum < lines.length; this.#lineNum++) {
       let line = lines[this.#lineNum]!;
+      this.#lineLengths.push(line.length + 1); // include newline
 
       if (line.length > maxLength) throw SyntaxError(`${this.#lineNum}: Line too long`);
 
       // Seperately trim leading whitespace to find comments. Inline comments don't exist in systemd
       // Don't stop on empty lines yet as they have to stop continuation
       const trimmed = line.replace(trimWhitespaceStart, "");
-      if (trimmed[0] === "#" || trimmed[0] === ";") continue;
-
-      if (this.#continuation) {
-        if (this.#continuation.length + line.length > maxLength)
-          throw SyntaxError(`${this.#lineNum}: Continuation line too long`);
-        if (!trimmed) this.warn("Continuation has been terminated by empty line", this.#lineNum - 1, "info");
-        this.#continuation += line;
-      }
-
-      let logical = this.#continuation || line;
-      if (logical[logical.length - 1] === "\\") {
-        // lines with backslash are called 'escaped'
-        this.#continuation = logical.slice(0, -1) + " ";
+      if (trimmed[0] === "#" || trimmed[0] === ";") {
+        this.doc.push({
+          type: "comment",
+          content: trimmed.slice(1),
+          delimiter: trimmed[0],
+          fromLine: this.#lineNum,
+          toLine: this.#lineNum,
+        });
         continue;
       }
 
-      this.#updateOutput(logical);
-      this.#continuation = "";
+      // The logic beneath differs from the original to preserve the raw line
+      if (continuation) {
+        if (continuation.length + line.length > maxLength)
+          throw SyntaxError(`${this.#lineNum}: Continuation line too long`);
+        if (!trimmed) {
+          this.warn("Continuation has been terminated by empty line", "info");
+
+          this.#updateOutput(continuation, rawLine);
+          continuation = "";
+          rawLine = "";
+
+          this.#updateOutput(line, line);
+          continue;
+        }
+
+        continuation += line;
+        rawLine += line;
+      }
+
+      let logical = continuation || line;
+      if (logical[logical.length - 1] === "\\") {
+        // lines with backslash are called 'escaped'
+        continuation = logical.slice(0, -1) + " ";
+        rawLine = logical;
+        continue;
+      }
+
+      this.#updateOutput(logical, rawLine || line);
+      continuation = "";
+      rawLine = "";
     }
 
-    if (this.#continuation) {
-      this.#updateOutput(this.#continuation);
+    if (continuation) {
+      this.#updateOutput(continuation, rawLine);
     }
 
+    this.generatorFunc();
     return this.output_mut;
   }
 }

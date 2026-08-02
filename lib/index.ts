@@ -38,6 +38,7 @@ function generate(input: ParsedOutput<string>) {
         key = key.replace(trimWhitespace, "");
         value = value.replace(trimWhitespace, "");
         if (!key) throw TypeError("Key is empty");
+        if (value[value.length - 1] === "\\") value += " "; // escape the backslash
 
         lines.push(`${key}=${value}`);
       }
@@ -50,4 +51,4 @@ function generate(input: ParsedOutput<string>) {
 }
 
 export { Parser, parse, parseDocument, generate };
-export type { ParsedValue, ParseFunc, ParseOptions, Severity };
+export type { ParsedValue as ParsedValue, ParseFunc, ParseOptions, Severity };

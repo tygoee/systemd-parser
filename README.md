@@ -1,33 +1,45 @@
 # Systemd parser
 
-Round-trip systemd configuration file parser.
+Systemd configuration file parser preserving comments and structure. Windows files with CRLF line endings are not supported. Systemd ignores trailing whitespace so `\r` will not often be an issue, except with values spanning multiple lines, where every line must be escaped with a backslash **at the end**, which does not work if there's a carriage return before it.
 
 Usage / documentation:
 
 - `parse(input, options)`:
+
+Parses the `input` string to return an object containing all sections with keys and values. `options` is an object with options shown in the example below.
 
 ```js
 import { parse } from "systemd-parser"
 
 const input = "[Section]\nKey=Value"
 const output = parse(input, {
-  // A function that executes upon successful assignment.
-  // If it returns something, it'll be used as value parser, changing the result
-  func: (section: string, key: string, value: string) => {};
-  warnFunc: (message: string, lineNum: number, severity: "hint"|"info"|"warning"|"error") => {}; // Ran on warnings
+  // Function that parses input text values to any data type for the output.
+  // When it doesn't return anything, values return like in the document
+  parseFunc: (section: string, key: string, value: string) => {};
+  // Function that serializes those values back into text strings.
+  // When it doesn't return anything, the parser tries to input the value as a string
+  serializeFunc: (section: string, key: string, value: {}) => string | undefined;
+
+  warnFunc: (
+    message: string,
+    severity: Severity, // "hint" | "info" | "warning" | "error",
+    location: [number, number, number] // line (1-based), from char, to char
+  ) => {}; // Ran on warnings
 
   logWarns: false;  // Log parsing warnings to the console
   strict: false;  // Make parsing fail on wrong syntax
 
-  includePrefixed: false; // default false, include keys prefixed with X-
-  allowedKeys: { Section: [ "Key1", "Key2" ] }; // object of allowed sections and keys. Prefix '-' to ignore a key
-  includeDisallowed: false; // include keys not allowed by allowedKeys
+  includePrefixed: false; // Include keys prefixed with X-
+  allowedKeys: { Section: [ "Key1", "Key2" ] }; // Object of allowed sections and keys.
+  includeDisallowed: false; // Include keys not allowed by allowedKeys
 })
 
 // output: { "Section": { "Key": [ "Value" ] } }
 ```
 
 - `generate(input)`:
+
+Generates a systemd file from the input object containing all sections with keys and values.
 
 ```js
 import { generate } from "systemd-parser";
@@ -39,26 +51,35 @@ const output = generate(input);
 
 - `parseDocument(input)`:
 
-```js
-import { parseDocument } from "systemd-parser"
+Parses the `input` string to return a modifiable `Document` class with metadata like parser warnings. `options` is an object with options shown in the example below.
 
-const doc = parseDocument("[Section]\nKey=Value")
+The output containing all sections with keys and values is accessed with `doc.output`, the string containing the modified file is accessed with `doc.content`
+
+- `doc.add(seection, key, value, index?)`: Add an assignment (key=value) to a section, optionally after the indexth assignment. When index is undefined or below 0, it's ignored
+- `doc.set(section, key, value, index?)`: Replace assignment at index with different assignment. When index is undefined or below 0, it removes all existing assignments.
+- `doc.remove(section, key, index?, strict=true)`: Remove assignment at index. When index is undefined or below 0, it removes all instances. When `strict` is set to false, it will not throw on indexes out of range
+
+```js
+import { parseDocument } from "systemd-parser";
+
+const options = {}; // see the first example for all options
+const doc = parseDocument("[Section]\nKey=Value", options);
 // doc.output: { "Section": { "Key": [ "Value" ] } }
 
-doc.add('Section', 'Key', 'ThirdValue')
-doc.add('Section', 'Key', 'SecondValue', 1) // insert
+doc.add("Section", "Key", "ThirdValue");
+doc.add("Section", "Key", "SecondValue", 1); // insert
 // doc.content: [Section] Key=Value Key=SecondValue Key=ThirdValue
 
-doc.set('Section', 'Key' 'OtherValue', 1)
+doc.set("Section", "Key", "OtherValue", 1);
 // doc.content: [Section] Key=Value Key=OtherValue Key=ThirdValue
 
-doc.remove('Section', 'Key', 1)
+doc.remove("Section", "Key", 1);
 // doc.content: [Section] Key=Value Key=ThirdValue
 
-doc.set('Section', 'Key', 'Value') // resets all instances
+doc.set("Section", "Key", "Value"); // resets all instances
 // doc.content: [Section] Key=Value
 
-doc.remove('Setion', 'Key', 'Value') // removes all instances
+doc.remove("Setion", "Key", "Value"); // removes all instances
 // doc.content: ""
 ```
 
