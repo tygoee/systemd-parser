@@ -2,11 +2,6 @@
 
 Systemd configuration file parser preserving comments and structure. Windows files with CRLF line endings are not supported. Systemd ignores trailing whitespace so `\r` will not often be an issue, except with values spanning multiple lines, where every line must be escaped with a backslash **at the end**, which does not work if there's a carriage return before it.
 
-> [!WARNING]
-> This has not been under active developement for a while, and it was stopped while building a pretty big overhaul fixing quite some poor design choices and bugs.
->
-> I might pick this project up again when I have the time and means to continue with [tygoee/congent](https://github.com/tygoee/congent)
-
 # Usage and documentation
 
 - `parse(input, options)`:
