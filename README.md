@@ -83,6 +83,20 @@ doc.remove("Setion", "Key", "Value"); // removes all instances
 // doc.content: ""
 ```
 
+The parser also lets you reuse a doc object for an interactive editor, by automatically reparsing upon setting `doc.content`. For example:
+
+```js
+import { parseDocument, generate } from "systemd-parser";
+
+const doc = parseDocument(generate({ Section: { Key: ["Value1"] } }));
+// doc.content: [Section] Key=Value1
+// doc.output: { "Section": { "Key": [ "Value1" ] } }
+
+doc.content = generate({ Section: { Key: ["Value2"] } });
+// doc.content: [Section] Key=Value2
+// doc.output: { "Section": { "Key": [ "Value2" ] } }
+```
+
 ## Systemd ini format
 
 Basics of the file format are listed at [systemd.syntax(7)](https://www.freedesktop.org/software/systemd/man/latest/systemd.syntax.html). For more, see the references below.

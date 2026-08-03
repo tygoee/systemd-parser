@@ -1,3 +1,4 @@
+// todo
 // test linefrom and lineto!
 // multiple section headers with last being empty
 // test #clearAssignment
@@ -84,6 +85,14 @@ test("test document setter: multiple existing assignments with index", () => {
   expect(doc.content).toBe("[Section]\nKey=Value3\nKey=Value2\n");
   expect(doc.output.Section?.Key?.[0]).toBe("Value3");
   expect(doc.output.Section?.Key?.[1]).toBe("Value2");
+});
+
+test("test document setter: keep assignment in right position", () => {
+  const doc = parseDocument("[Section]\nKey1=Value1\nKey2=Value2", options);
+  doc.set("Section", "Key2", "Value0");
+  expect(doc.content).toBe("[Section]\nKey1=Value1\nKey2=Value0\n");
+  expect(doc.output.Section?.Key1?.[0]).toBe("Value1");
+  expect(doc.output.Section?.Key2?.[0]).toBe("Value0");
 });
 
 test("test document adder: existing assignments without meaningful index", () => {

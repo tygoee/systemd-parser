@@ -147,11 +147,12 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
   parse(): typeof this.output_mut {
     // CRLF could be broken, but systemd works on Linux. Could become a stream for efficiency
     // Adds a first value as line numbers count from 1 instead of 0
-    const lines = ["", ...this.content.split("\n")];
+    const lines = ["", ...this.content_mut.split("\n")];
     let rawLine = "";
     let continuation = "";
 
     this.warnings = this.#warningsProxy();
+    this.doc = [];
 
     this.#section = "";
     this.#lineFrom = 1;

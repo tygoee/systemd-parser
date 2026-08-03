@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { parse } from "../lib/index.ts";
+import { parse, generate, parseDocument } from "../lib/index.ts";
 
 // Tests from https://github.com/systemd/systemd/blob/main/src/test/test-conf-parser.c
 const tests = [
@@ -167,3 +167,12 @@ test.each(tests.map((test, index) => [index, test]))(
     }
   },
 );
+
+test("Test reparsing doc.content", () => {
+  const doc = parseDocument(generate({ Section: { Key: ["Value1"] } }));
+  expect(doc.content).toBe("[Section]\nKey=Value1\n");
+  expect(doc.output.Section?.Key?.[0]).toBe("Value1");
+  doc.content = generate({ Section: { Key: ["Value2"] } });
+  expect(doc.content).toBe("[Section]\nKey=Value2\n");
+  expect(doc.output.Section?.Key?.[0]).toBe("Value2");
+});

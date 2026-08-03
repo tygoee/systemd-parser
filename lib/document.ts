@@ -79,7 +79,7 @@ type NodeDocument<V> = Array<SectionNode | AssignmentNode<V> | CommentNode | Bla
 
 // Edit while preserving source formatting. This doesn't give much control but enough
 export class Document<F extends ParseFunc | void = void> {
-  /** Input passed to parse() */ content: string;
+  /** Input passed to parse() */ protected content_mut: string;
   /** Options passed to parse() */ options: ParseOptions<F>;
   /** Mutable output from parse() */ protected output_mut: ParsedOutput<ParsedValue<F>>;
   /** Document containing all nodes */ doc: NodeDocument<ParsedValue<F>>;
@@ -91,12 +91,21 @@ export class Document<F extends ParseFunc | void = void> {
     return this.output_mut;
   }
 
+  get content(): string {
+    return this.content_mut;
+  }
+
+  set content(value: string) {
+    this.content_mut = value;
+    this.parserFunc();
+  }
+
   constructor(input: string, options: ParseOptions<F> = {}) {
     if (typeof input !== "string") throw TypeError("First argument must be a string");
     if (typeof options !== "object") throw TypeError("Second argument must be an object");
 
     // always one trailing whitespace
-    this.content = input.replace(trailingNewlines, "\n");
+    this.content_mut = input.replace(trailingNewlines, "\n");
     this.options = options;
     this.output_mut = {};
     this.doc = [];
@@ -141,7 +150,7 @@ export class Document<F extends ParseFunc | void = void> {
     let content = lines.join("\n");
     if (content[content.length - 1] !== "\n") content += "\n";
 
-    this.content = content;
+    this.content_mut = content;
   }
 
   #prepare(section: string, key: string, value: ParsedValue<F>): [string, string, string, ParsedValue<F>] {
@@ -205,7 +214,6 @@ export class Document<F extends ParseFunc | void = void> {
     this.doc.splice(this.doc.indexOf(assignment), 1);
   }
 
-  // todo: use real value instead of raw value, generate new output content
   /** Index will be ignored if it is undefined or negative */
   set(section: string, key: string, value: ParsedValue<F>, index?: number) {
     if (typeof section !== "string") throw TypeError("Section must be of type string");
@@ -237,15 +245,16 @@ export class Document<F extends ParseFunc | void = void> {
     }
 
     if (index === undefined || index < 0) {
-      const existing = assignments.filter((assignment) => assignment.key === key);
+      const existing = assignments.filter((node) => node.key === key);
       if (existing.length === 0) {
+        // Just add as always when there are no other keys in section
         const docIndex = this.doc.indexOf(assignments[assignments.length - 1]!) + 1;
         this.doc.splice(docIndex, 0, { type: "assignment", key, rawValue, joinedValue, value });
       } else {
         // Remove all assignments and remove duplicates
         // This doesn't take multiple section headers with the same title into account,
         // but those should only be able to have been added by users
-        const firstIndex = this.doc.indexOf(assignments[0]!);
+        const firstIndex = this.doc.indexOf(existing[0]!);
         this.doc = this.doc.filter(
           (node) => node.type !== "assignment" || (node.type === "assignment" && node.key !== key),
         );
@@ -262,7 +271,6 @@ export class Document<F extends ParseFunc | void = void> {
     this.generatorFunc();
   }
 
-  // todo: use real value instead of raw value, generate new output content
   /** Index will be ignored if it is undefined or negative */
   add(section: string, key: string, value: ParsedValue<F>, index?: number) {
     if (typeof section !== "string" || typeof key !== "string" || typeof value !== "string")
@@ -307,7 +315,6 @@ export class Document<F extends ParseFunc | void = void> {
     this.generatorFunc();
   }
 
-  // todo: use real value instead of raw value, generate new output content
   /** Index will be ignored if it is undefined or negative */
   remove(section: string, key: string, index?: number, strict: boolean = true) {
     if (typeof section !== "string") throw TypeError("Section must be of type string");
