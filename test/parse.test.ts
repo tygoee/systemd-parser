@@ -168,11 +168,23 @@ test.each(tests.map((test, index) => [index, test]))(
   },
 );
 
-test("Test reparsing doc.content", () => {
+test("test reparsing doc.content", () => {
   const doc = parseDocument(generate({ Section: { Key: ["Value1"] } }));
   expect(doc.content).toBe("[Section]\nKey=Value1\n");
   expect(doc.output.Section?.Key?.[0]).toBe("Value1");
   doc.content = generate({ Section: { Key: ["Value2"] } });
   expect(doc.content).toBe("[Section]\nKey=Value2\n");
   expect(doc.output.Section?.Key?.[0]).toBe("Value2");
+});
+
+test("test preserving continuation upon reparse", () => {
+  const doc = parseDocument("[Section]\nKey=a\\\nb\\\nc\\\nd");
+  doc.content = doc.content; // reparse
+  expect(doc.content).toBe("[Section]\nKey=a\\\nb\\\nc\\\nd\n");
+});
+
+test("test preserving starting whitespace in continuation upon reparse", () => {
+  const doc = parseDocument("[Section]\nKey=a\\\n  b\\\n  c");
+  doc.content = doc.content; // reparse
+  expect(doc.content).toBe("[Section]\nKey=a\\\n  b\\\n  c\n");
 });

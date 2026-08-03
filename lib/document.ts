@@ -101,8 +101,8 @@ export class Document<F extends ParseFunc | void = void> {
   }
 
   constructor(input: string, options: ParseOptions<F> = {}) {
-    if (typeof input !== "string") throw TypeError("First argument must be a string");
-    if (typeof options !== "object") throw TypeError("Second argument must be an object");
+    if (typeof input !== "string") throw new TypeError("First argument must be a string");
+    if (typeof options !== "object") throw new TypeError("Second argument must be an object");
 
     // always one trailing whitespace
     this.content_mut = input.replace(trailingNewlines, "\n");
@@ -155,10 +155,10 @@ export class Document<F extends ParseFunc | void = void> {
 
   #prepare(section: string, key: string, value: ParsedValue<F>): [string, string, string, ParsedValue<F>] {
     // validates section/key/value. assumes types are already tested
-    if (sectionValidator.test(section)) throw TypeError(`Bad characters in section header`);
+    if (sectionValidator.test(section)) throw new TypeError(`Bad characters in section header`);
 
     key = key.replace(trimWhitespace, "");
-    if (!key) throw TypeError("Key is empty");
+    if (!key) throw new TypeError("Key is empty");
 
     let joinedValue: string;
     if (typeof this.options.serializeFunc === "function") joinedValue = this.options.serializeFunc(section, key, value);
@@ -216,10 +216,10 @@ export class Document<F extends ParseFunc | void = void> {
 
   /** Index will be ignored if it is undefined or negative */
   set(section: string, key: string, value: ParsedValue<F>, index?: number) {
-    if (typeof section !== "string") throw TypeError("Section must be of type string");
-    if (typeof key !== "string") throw TypeError("Key must be of type string");
-    if (typeof value !== "string") throw TypeError("Value must be of type string");
-    if (index !== undefined && typeof index !== "number") throw TypeError("Index must be a number");
+    if (typeof section !== "string") throw new TypeError("Section must be of type string");
+    if (typeof key !== "string") throw new TypeError("Key must be of type string");
+    if (typeof value !== "string") throw new TypeError("Value must be of type string");
+    if (index !== undefined && typeof index !== "number") throw new TypeError("Index must be a number");
 
     let rawValue: string, joinedValue: string;
     [key, rawValue, joinedValue, value] = this.#prepare(section, key, value);
@@ -274,9 +274,9 @@ export class Document<F extends ParseFunc | void = void> {
   /** Index will be ignored if it is undefined or negative */
   add(section: string, key: string, value: ParsedValue<F>, index?: number) {
     if (typeof section !== "string" || typeof key !== "string" || typeof value !== "string")
-      throw TypeError("First three function arguments must be of type string");
+      throw new TypeError("First three function arguments must be of type string");
 
-    if (index !== undefined && typeof index !== "number") throw TypeError("Fourth argument must be a number");
+    if (index !== undefined && typeof index !== "number") throw new TypeError("Fourth argument must be a number");
 
     let rawValue: string, joinedValue: string;
     [key, rawValue, joinedValue, value] = this.#prepare(section, key, value);
@@ -317,20 +317,20 @@ export class Document<F extends ParseFunc | void = void> {
 
   /** Index will be ignored if it is undefined or negative */
   remove(section: string, key: string, index?: number, strict: boolean = true) {
-    if (typeof section !== "string") throw TypeError("Section must be of type string");
-    if (typeof key !== "string") throw TypeError("Key must be of type string");
-    if (index !== undefined && typeof index !== "number") throw TypeError("Index must be a number");
+    if (typeof section !== "string") throw new TypeError("Section must be of type string");
+    if (typeof key !== "string") throw new TypeError("Key must be of type string");
+    if (index !== undefined && typeof index !== "number") throw new TypeError("Index must be a number");
 
     const sections = this.doc.filter((node) => node.type === "section" && node.name === section);
     if (sections.length === 0) {
-      if (strict) throw TypeError("Section does not exist");
+      if (strict) throw new TypeError("Section does not exist");
       return;
     }
 
     const assignments = this.#getAssignments(section);
 
     if (assignments.length === 0) {
-      if (strict) throw TypeError("Key does not exist");
+      if (strict) throw new TypeError("Key does not exist");
       return;
     }
 
@@ -338,7 +338,7 @@ export class Document<F extends ParseFunc | void = void> {
       const assignment = assignments[index];
 
       if (assignment === undefined) {
-        if (strict) throw RangeError("Assignment index out of range");
+        if (strict) throw new RangeError("Assignment index out of range");
         return;
       }
 

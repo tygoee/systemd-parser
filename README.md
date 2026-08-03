@@ -23,7 +23,7 @@ const output = parse(input, {
   warnFunc: (
     message: string,
     severity: Severity, // "hint" | "info" | "warning" | "error",
-    location: [number, number, number] // line (1-based), from char, to char
+    location: [number, number, number] // line number (1-based), from char, to char
   ) => {}; // Ran on warnings
 
   logWarns: false;  // Log parsing warnings to the console

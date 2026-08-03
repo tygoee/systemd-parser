@@ -39,16 +39,19 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
     this.#lineLengths = [0]; // 1 value already since it's 1-based
   }
 
-  /** Don't pass a location to use the current one */
+  #getLineLength(): number {
+    return this.#lineLengths.slice(this.#lineFrom, this.#lineNum + 1).reduce((sum, len) => sum + len, 0);
+  }
+
+  /** Don't pass a location to use the current one. Location: line number (1-based), from char, to char */
   warn(message: string, severity: Severity = "warning", location?: [number, number, number]): { type: "none" } {
-    if (!location) location = [this.#lineNum, 0, this.#lineLengths[this.#lineNum]!];
+    if (!location) location = [this.#lineFrom, 0, this.#getLineLength()];
 
     if (this.options.logWarns) console.warn(`${location[0]}:${location[1]}: ${message}`);
     if (this.options.strict && !["hint", "info"].includes(severity))
-      throw SyntaxError(`${location[0]}:${location[1]}: ${message}`);
+      throw new SyntaxError(`${location[0]}:${location[1]}: ${message}`);
     this.warnings.push([message, severity, location]);
 
-    console.log(message);
     return { type: "none" };
   }
 
@@ -83,10 +86,7 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
 
     // Assignment (key=value)
     const equalsIndex = line.indexOf("=");
-    if (equalsIndex === -1) {
-      console.log(line);
-      return this.warn("Missing '=', ignoring line.");
-    }
+    if (equalsIndex === -1) return this.warn("Missing '=', ignoring line.");
     if (equalsIndex === 0) return this.warn("Missing key name before '=', ignoring line.");
 
     // The checks and functions from the original are in updateOutput
@@ -119,7 +119,7 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
 
       const section = this.options.allowedKeys?.[this.#section];
       if (typeof this.options.allowedKeys === "object" && !section?.includes(parsed.key)) {
-        this.warn("Unknown key. Ignoring");
+        this.warn("Unknown key. Ignoring", "warning", [this.#lineFrom, 0, rawLine.indexOf("=") - 1]);
         if (!this.options.includeDisallowed) return;
       }
 
@@ -160,8 +160,9 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
     for (this.#lineNum = 1; this.#lineNum < lines.length; this.#lineNum++) {
       let line = lines[this.#lineNum]!;
       this.#lineLengths.push(line.length + 1); // include newline
+      if (!continuation) this.#lineFrom = this.#lineNum;
 
-      if (line.length > maxLength) throw SyntaxError(`${this.#lineNum}: Line too long`);
+      if (line.length > maxLength) throw new SyntaxError(`${this.#lineNum}: Line too long`);
 
       // Seperately trim leading whitespace to find comments. Inline comments don't exist in systemd
       // Don't stop on empty lines yet as they have to stop continuation
@@ -180,7 +181,7 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
       // The logic beneath differs from the original to preserve the raw line
       if (continuation) {
         if (continuation.length + line.length > maxLength)
-          throw SyntaxError(`${this.#lineNum}: Continuation line too long`);
+          throw new SyntaxError(`${this.#lineNum}: Continuation line too long`);
         if (!trimmed) {
           this.warn("Continuation has been terminated by empty line", "info");
 
@@ -193,14 +194,14 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
         }
 
         continuation += line;
-        rawLine += line;
+        rawLine += "\n" + line;
       }
 
       let logical = continuation || line;
       if (logical[logical.length - 1] === "\\") {
         // lines with backslash are called 'escaped'
         continuation = logical.slice(0, -1) + " ";
-        rawLine = logical;
+        if (!rawLine) rawLine = logical;
         continue;
       }
 

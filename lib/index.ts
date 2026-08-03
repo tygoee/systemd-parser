@@ -30,14 +30,14 @@ function generate(input: ParsedOutput<string>) {
   const lines: string[] = [];
 
   for (const [section, assignments] of Object.entries(input)) {
-    if (sectionValidator.test(section)) throw TypeError(`Bad characters in section header`);
+    if (sectionValidator.test(section)) throw new TypeError(`Bad characters in section header`);
 
     lines.push(`[${section}]`);
     for (let [key, values] of Object.entries(assignments)) {
       for (let value of values) {
         key = key.replace(trimWhitespace, "");
         value = value.replace(trimWhitespace, "");
-        if (!key) throw TypeError("Key is empty");
+        if (!key) throw new TypeError("Key is empty");
         if (value[value.length - 1] === "\\") value += " "; // escape the backslash
 
         lines.push(`${key}=${value}`);
