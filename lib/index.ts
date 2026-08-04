@@ -4,7 +4,7 @@ This is implementing the workflow from config_parse() in
 https://github.com/systemd/systemd/blob/main/src/shared/conf-parser.c
 
 It's also mostly rewritten in go for podman, in Parse():
-https://github.com/containers/podman/blob/main/pkg/systemd/parser/unitfile.go
+https://github.com/podman-container-tools/podman/blob/main/pkg/systemd/parser/unitfile.go
 */
 
 import { Parser } from "./parser.js";

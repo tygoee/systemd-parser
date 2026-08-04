@@ -1,5 +1,5 @@
 import { Document, sectionValidator, trimWhitespace, trimWhitespaceStart } from "./document.js";
-import type { ParseFunc, ParseOptions, Severity } from "./document.js";
+import type { ParseFunc, ParseOptions, Severity, Warning } from "./document.js";
 
 const maxLength = 1048576; // 1 MiB
 
@@ -17,11 +17,10 @@ type ParsedLine =
       type: "none";
     };
 
-type Warning = [string, Severity, [number, number, number]];
-
 export class Parser<F extends ParseFunc | void = void> extends Document<F> {
   /** message, severity, [line (1-based), from char, to char] */
   warnings: Warning[];
+  warningOffset: number;
   #section: string;
 
   /** Current line, 1-based */ #lineNum: number;
@@ -32,6 +31,7 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
     super(input, options);
     this.parserFunc = this.parse;
     this.warnings = this.#warningsProxy();
+    this.warningOffset = 0;
     this.#section = "";
 
     this.#lineNum = 1;
@@ -45,7 +45,7 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
 
   /** Don't pass a location to use the current one. Location: line number (1-based), from char, to char */
   warn(message: string, severity: Severity = "warning", location?: [number, number, number]): { type: "none" } {
-    if (!location) location = [this.#lineFrom, 0, this.#getLineLength()];
+    if (!location) location = [this.#lineFrom, this.warningOffset, this.#getLineLength() - this.warningOffset];
 
     if (this.options.logWarns) console.warn(`${location[0]}:${location[1]}: ${message}`);
     if (this.options.strict && !["hint", "info"].includes(severity))
@@ -60,9 +60,11 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
     return new Proxy([], {
       set(target: Warning[], prop: string | symbol, value: Warning): boolean {
         if (isNaN(Number(prop))) return true;
-        if (typeof self.options.warnFunc === "function") self.options.warnFunc(...value);
 
+        if (!value[2]) value[2] = [self.#lineFrom, self.warningOffset, self.#getLineLength() - self.warningOffset];
+        if (typeof self.options.warnFunc === "function") self.options.warnFunc(...value);
         target[Number(prop)] = value;
+
         return true;
       },
     });
@@ -73,12 +75,12 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
 
     // Section
     if (line[0] === "[") {
-      if (line[line.length - 1] !== "]") return this.warn(`Invalid section header, ignoring line.`);
+      if (line[line.length - 1] !== "]") return this.warn(`Invalid section header, ignoring line.`, "error");
 
       const name = line.slice(1, -1);
 
       // The section name may not contain control chars, quotes or backslashes
-      if (sectionValidator.test(name)) return this.warn(`Invalid section header, ignoring line.`);
+      if (sectionValidator.test(name)) return this.warn(`Invalid section header, ignoring line.`, "error");
 
       // The checks done in the original are in updateOutput
       return { type: "section", name: name };
@@ -108,27 +110,31 @@ export class Parser<F extends ParseFunc | void = void> extends Document<F> {
         typeof this.options.allowedKeys === "object" &&
         !Object.keys(this.options.allowedKeys).includes(parsed.name)
       ) {
-        this.warn("Unkown section. Ignoring.");
-        if (!this.options.includeDisallowed) return;
+        this.warn("Unkown section. Ignoring.", "error");
+        if (!this.options.includeDisallowed) return void this.doc.push({ type: "invalid", content: rawLine });
       }
 
       this.doc.push({ type: "section", name: parsed.name, fromLine: this.#lineNum, toLine: this.#lineNum });
     } else if (parsed.type === "assignment") {
-      if (!this.#section) return void this.warn("Assignment outside of section. Ignoring.");
-      if (!this.options.includePrefixed && parsed.key.startsWith("X-")) return;
+      if (!this.#section) return void this.warn("Assignment outside of section. Ignoring.", "error");
+      if (!this.options.includePrefixed && parsed.key.startsWith("X-"))
+        return void this.doc.push({ type: "invalid", content: rawLine });
 
       const section = this.options.allowedKeys?.[this.#section];
       if (typeof this.options.allowedKeys === "object" && !section?.includes(parsed.key)) {
-        this.warn("Unknown key. Ignoring", "warning", [this.#lineFrom, 0, rawLine.indexOf("=") - 1]);
-        if (!this.options.includeDisallowed) return;
+        this.warn("Unknown key. Ignoring", "error", [this.#lineFrom, 0, rawLine.indexOf("=") - 1]);
+        if (!this.options.includeDisallowed) return void this.doc.push({ type: "invalid", content: rawLine });
       }
 
+      const valueIndex = rawLine.indexOf("=") + 1;
+
+      this.warningOffset = valueIndex;
       const result =
         typeof this.options.parseFunc === "function"
-          ? this.options.parseFunc(this.#section, parsed.key, parsed.value)
+          ? this.options.parseFunc(this.#section, parsed.key, parsed.value, this)
           : parsed.value;
+      this.warningOffset = 0;
 
-      const valueIndex = rawLine.indexOf("=") + 1;
       this.doc.push({
         type: "assignment",
         key: parsed.key,

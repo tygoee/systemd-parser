@@ -188,3 +188,5 @@ test("test preserving starting whitespace in continuation upon reparse", () => {
   doc.content = doc.content; // reparse
   expect(doc.content).toBe("[Section]\nKey=a\\\n  b\\\n  c\n");
 });
+
+// todo: test reparsing not allowed keys

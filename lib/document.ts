@@ -1,3 +1,5 @@
+import type { Parser } from "./parser.js";
+
 // Only \t, \n, \r, and spaces
 export const trimWhitespaceStart = /^[ \t\n\r]+/;
 export const trimWhitespace = /^[ \t\n\r]+|[ \t\n\r]+$/g;
@@ -7,19 +9,22 @@ export const sectionValidator = /[\x01-\x1f\x7f"'\\]/;
 export const trailingNewlines = /\n*$/;
 
 export type Severity = "hint" | "info" | "warning" | "error";
-
-export type ParseFunc = (section: string, key: string, value: string) => any;
+export type Warning = [string, Severity, [number, number, number]];
 
 export type ParsedOutput<V> = Record<string, Record<string, V[]>>;
+
+export type ParseFunc = (section: string, key: string, value: string, parser: Parser<any>) => any;
 
 /** The generic is used to determine the return argument of func */
 export type ParseOptions<F extends ParseFunc | void = void> = {
   // Function that parses the text values from the input to any data type.
   // When it doesn't return anything, values return like in the document
+  // parser is the current parser object that is optionally passed
   parseFunc?: F; /** (section: string, key: string, value: string) => ... */
   // Function that serializes those values back into text strings.
   // When it doesn't return anything, the parser tries to input the value as a string
-  serializeFunc?: (section: string, key: string, value: ParsedValue<F>) => string;
+  // These warnings can be accessed via doc.serializationWarnings and can be any array
+  serializeFunc?: (section: string, key: string, value: ParsedValue<F>, warnings: any[]) => string;
   warnFunc?: (message: string, severity: Severity, location: [number, number, number]) => void; /** ran on warnings */
 
   logWarns?: boolean; /** default false, logs parsing warnings to the console */
@@ -85,6 +90,7 @@ export class Document<F extends ParseFunc | void = void> {
   /** Document containing all nodes */ doc: NodeDocument<ParsedValue<F>>;
   protected parserFunc: () => ParsedOutput<ParsedValue<F>>;
   protected generatorFunc: () => void;
+  serializationWarnings: any[] = [];
 
   /** Read-only to prevent confusion with document not changing when adding/removing values */
   get output(): DeepReadonly<ParsedOutput<ParsedValue<F>>> {
@@ -101,8 +107,8 @@ export class Document<F extends ParseFunc | void = void> {
   }
 
   constructor(input: string, options: ParseOptions<F> = {}) {
-    if (typeof input !== "string") throw new TypeError("First argument must be a string");
-    if (typeof options !== "object") throw new TypeError("Second argument must be an object");
+    if (typeof input !== "string") throw new TypeError("Input must be a string");
+    if (typeof options !== "object") throw new TypeError("Options must be an object");
 
     // always one trailing whitespace
     this.content_mut = input.replace(trailingNewlines, "\n");
@@ -161,7 +167,8 @@ export class Document<F extends ParseFunc | void = void> {
     if (!key) throw new TypeError("Key is empty");
 
     let joinedValue: string;
-    if (typeof this.options.serializeFunc === "function") joinedValue = this.options.serializeFunc(section, key, value);
+    if (typeof this.options.serializeFunc === "function")
+      joinedValue = this.options.serializeFunc(section, key, value, this.serializationWarnings);
     else joinedValue = value;
 
     joinedValue = joinedValue.replace(trimWhitespace, "");
@@ -273,10 +280,10 @@ export class Document<F extends ParseFunc | void = void> {
 
   /** Index will be ignored if it is undefined or negative */
   add(section: string, key: string, value: ParsedValue<F>, index?: number) {
-    if (typeof section !== "string" || typeof key !== "string" || typeof value !== "string")
-      throw new TypeError("First three function arguments must be of type string");
-
-    if (index !== undefined && typeof index !== "number") throw new TypeError("Fourth argument must be a number");
+    if (typeof section !== "string") throw new TypeError("Section must be of type string");
+    if (typeof key !== "string") throw new TypeError("Key must be of type string");
+    if (typeof value !== "string") throw new TypeError("Value must be of type string");
+    if (index !== undefined && typeof index !== "number") throw new TypeError("Index must be a number");
 
     let rawValue: string, joinedValue: string;
     [key, rawValue, joinedValue, value] = this.#prepare(section, key, value);

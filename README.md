@@ -2,6 +2,13 @@
 
 Systemd configuration file parser preserving comments and structure. Windows files with CRLF line endings are not supported. Systemd ignores trailing whitespace so `\r` will not often be an issue, except with values spanning multiple lines, where every line must be escaped with a backslash **at the end**, which does not work if there's a carriage return before it.
 
+This parser tries to use the same value parsing logic as used in the source code:
+
+- It goes through all lines of the file, removing comments and joining lines that are continued with `\`. See `parse()`
+- Then it passes that to a function which adds it to the document (`generateOutput()`). It does that by:
+  - Parsing the line for assignments/sections. In here also checks if the keys exist in the section, when configured. See `parseLine()`
+  - Adding it to the document. In the case of an assigment, it parses your value with `options.parseFunc()`, when it's defined.
+
 # Usage and documentation
 
 - `parse(input, options)`:
@@ -15,10 +22,12 @@ const input = "[Section]\nKey=Value"
 const output = parse(input, {
   // Function that parses input text values to any data type for the output.
   // When it doesn't return anything, values return like in the document
-  parseFunc: (section: string, key: string, value: string) => {};
+  // parser is the current parser object that's passed and can be used for e.g. warnings
+  parseFunc: (section: string, key: string, value: string, parser?: Parser) => {};
   // Function that serializes those values back into text strings.
   // When it doesn't return anything, the parser tries to input the value as a string
-  serializeFunc: (section: string, key: string, value: {}) => string | undefined;
+  // These warnings can be accessed via doc.serializationWarnings and can be any array
+  serializeFunc: (section: string, key: string, value: {}, warnings?: any[]) => string | undefined;
 
   warnFunc: (
     message: string,
@@ -31,7 +40,7 @@ const output = parse(input, {
 
   includePrefixed: false; // Include keys prefixed with X-
   allowedKeys: { Section: [ "Key1", "Key2" ] }; // Object of allowed sections and keys.
-  includeDisallowed: false; // Include keys not allowed by allowedKeys
+  includeDisallowed: false; // Include keys not allowed by allowedKeys, when allowedKeys is specified
 })
 
 // output: { "Section": { "Key": [ "Value" ] } }
@@ -116,4 +125,4 @@ Basics of the file format are listed at [systemd.syntax(7)](https://www.freedesk
 
 ## License
 
-This project uses the MIT license. It uses some of the logic from Red Hat for parsing systemd ini files, which is licensed under both LGPL-2.1+ [[1]](https://github.com/systemd/systemd/blob/main/src/shared/conf-parser.c) and Apache-2.0 [[2]](https://github.com/containers/podman/blob/main/pkg/systemd/parser/unitfile.go). For more details, see [NOTICE](./NOTICE)
+This project uses the MIT license. It uses some of the logic from Red Hat for parsing systemd ini files, which is licensed under both LGPL-2.1+ [[1]](https://github.com/systemd/systemd/blob/main/src/shared/conf-parser.c) and Apache-2.0 [[2]](https://github.com/podman-container-tools/podman/blob/main/pkg/systemd/parser/unitfile.go). For more details, see [NOTICE](./NOTICE)
